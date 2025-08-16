@@ -2,95 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Viper Discord Bot - Black & Red Theme Design System */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Core Black/Red Theme - Dark Mode Only */
+    --background: 0 0% 7%;
+    --background-secondary: 0 0% 11%;
+    --background-tertiary: 0 0% 15%;
+    --foreground: 0 0% 95%;
+    --foreground-muted: 0 0% 70%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Red Accent Colors */
+    --red-primary: 0 85% 60%;
+    --red-secondary: 0 75% 50%;
+    --red-dark: 0 65% 40%;
+    --red-glow: 0 85% 60%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* Glass Effect */
+    --glass-bg: 0 0% 12%;
+    --glass-border: 0 0% 25%;
+    --glass-shadow: 0 0% 0%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Discord-inspired Colors */
+    --discord-primary: 235 86% 65%;
+    --discord-secondary: 235 85% 60%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Component Colors */
+    --card: var(--glass-bg);
+    --card-foreground: var(--foreground);
+    --card-border: var(--glass-border);
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --primary: var(--red-primary);
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: var(--red-secondary);
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --secondary: var(--background-secondary);
+    --secondary-foreground: var(--foreground);
+    --secondary-hover: var(--background-tertiary);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --muted: var(--background-secondary);
+    --muted-foreground: var(--foreground-muted);
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --accent: var(--red-primary);
+    --accent-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --sidebar-background: 0 0% 98%;
+    --border: var(--glass-border);
+    --input: var(--background-secondary);
+    --input-border: var(--glass-border);
+    --ring: var(--red-primary);
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --radius: 0.75rem;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    /* Sidebar Specific */
+    --sidebar-background: var(--background);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--red-primary);
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: var(--background-secondary);
+    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-border: var(--glass-border);
+    --sidebar-ring: var(--red-primary);
+
+    /* Gradients */
+    --gradient-red: linear-gradient(135deg, hsl(var(--red-primary)), hsl(var(--red-dark)));
+    --gradient-glass: linear-gradient(135deg, hsl(var(--glass-bg) / 0.8), hsl(var(--glass-bg) / 0.4));
+    --gradient-glow: radial-gradient(circle at center, hsl(var(--red-glow) / 0.3), transparent 70%);
+
+    /* Shadows */
+    --shadow-glass: 0 8px 32px hsl(var(--glass-shadow) / 0.3);
+    --shadow-red-glow: 0 0 30px hsl(var(--red-glow) / 0.4);
+    --shadow-button: 0 4px 15px hsl(var(--red-primary) / 0.3);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s ease-out;
   }
 }
 
@@ -101,5 +90,77 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Glass Card Effect */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-card-border rounded-xl;
+    box-shadow: var(--shadow-glass);
+  }
+
+  /* Red Glow Button Effect */
+  .btn-glow {
+    @apply transition-all duration-300;
+    box-shadow: var(--shadow-button);
+  }
+
+  .btn-glow:hover {
+    box-shadow: var(--shadow-red-glow);
+    transform: translateY(-1px);
+  }
+
+  /* Discord Avatar Styles */
+  .discord-avatar {
+    @apply rounded-full ring-2 ring-primary/30 transition-all duration-300;
+  }
+
+  .discord-avatar:hover {
+    @apply ring-primary/60;
+    box-shadow: var(--shadow-red-glow);
+  }
+
+  /* Sidebar Navigation Styles */
+  .nav-icon {
+    @apply w-6 h-6 transition-all duration-300;
+  }
+
+  .nav-icon.active {
+    @apply text-primary;
+    filter: drop-shadow(0 0 8px hsl(var(--red-glow) / 0.6));
+  }
+
+  /* Server Card Hover Effects */
+  .server-card {
+    @apply glass-card p-4 transition-all duration-300 hover:scale-[1.02] cursor-pointer;
+  }
+
+  .server-card:hover {
+    @apply border-primary/30;
+    box-shadow: var(--shadow-glass), 0 0 20px hsl(var(--red-glow) / 0.2);
+  }
+
+  /* Gradient Backgrounds */
+  .bg-gradient-red {
+    background: var(--gradient-red);
+  }
+
+  .bg-gradient-glass {
+    background: var(--gradient-glass);
+  }
+
+  /* Loading Animation */
+  .pulse-red {
+    animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-red {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
 }
