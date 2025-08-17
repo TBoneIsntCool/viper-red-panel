@@ -29,11 +29,11 @@ interface PanelProps {
 
 interface ModerationLog {
   id: number;
-  action_type: string;
-  target_user: string;
+  action: string;
+  moderator: string;
+  target: string;
   reason: string;
-  moderator_name: string;
-  created_at: string;
+  timestamp: string;
 }
 
 interface ServerStats {
@@ -71,30 +71,17 @@ const Panel = ({ user }: PanelProps) => {
     if (!user) return;
 
     try {
-      // Load moderation logs
-      const logsResponse = await fetch('/functions/v1/panel-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'get_moderation_logs', 
-          server_id: serverId 
-        })
-      });
-      const logsData = await logsResponse.json();
-      setModerationLogs(logsData.logs || []);
-
-      // Load server stats
-      const statsResponse = await fetch('/functions/v1/panel-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'get_server_stats', 
-          server_id: serverId 
-        })
-      });
-      const statsData = await statsResponse.json();
-      setServerStats(statsData);
-
+      const response = await fetch(`/api/panel/${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setModerationLogs(data.moderationLogs || []);
+        setServerStats({
+          memberCount: data.serverStats.activeMembers || 0,
+          todayModerations: data.serverStats.moderationsToday || 0,
+          activeModerators: data.serverStats.activeModerators || 0,
+          totalShiftTime: data.serverStats.totalShiftTime || 0
+        });
+      }
     } catch (error) {
       console.error('Failed to load panel data:', error);
       toast({
@@ -111,18 +98,14 @@ const Panel = ({ user }: PanelProps) => {
     if (!user) return;
 
     try {
-      const response = await fetch('/functions/v1/panel-data', {
+      const response = await fetch('/api/shift/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'start_shift', 
-          user_id: user.id, 
-          server_id: serverId 
-        })
+        body: JSON.stringify({ userId: user.id })
       });
       
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
         setShiftActive(true);
         setShiftStartTime(new Date());
         toast({
@@ -145,18 +128,14 @@ const Panel = ({ user }: PanelProps) => {
     if (!user) return;
 
     try {
-      const response = await fetch('/functions/v1/panel-data', {
+      const response = await fetch('/api/shift/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'end_shift', 
-          user_id: user.id, 
-          server_id: serverId 
-        })
+        body: JSON.stringify({ userId: user.id })
       });
       
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
         setShiftActive(false);
         setShiftStartTime(null);
         toast({
@@ -191,19 +170,20 @@ const Panel = ({ user }: PanelProps) => {
     if (!user) return;
 
     try {
-      const response = await fetch('/functions/v1/panel-data', {
+      const response = await fetch('/api/moderation/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'log_action', 
-          user_id: user.id, 
-          server_id: serverId,
-          data: { action, target, reason }
+        body: JSON.stringify({
+          moderatorId: user.id,
+          action: action,
+          targetUser: target,
+          reason: reason || 'No reason provided',
+          serverId: serverId
         })
       });
       
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
         toast({
           title: "Action Logged",
           description: `${action} action recorded for ${target}`
@@ -331,24 +311,24 @@ const Panel = ({ user }: PanelProps) => {
                   <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
                   </div>
-                ) : moderationLogs.length > 0 ? (
-                  moderationLogs.slice(0, 5).map((log) => (
-                    <div key={log.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        {log.action_type === 'warn' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-                        {log.action_type === 'ban' && <Ban className="h-4 w-4 text-red-500" />}
-                        {log.action_type === 'kick' && <UserX className="h-4 w-4 text-orange-500" />}
-                        {log.action_type === 'clear_messages' && <MessageSquare className="h-4 w-4 text-blue-500" />}
-                        {log.action_type === 'timeout' && <Clock className="h-4 w-4 text-purple-500" />}
-                        <span className="text-sm font-medium">
-                          {log.action_type} - {log.target_user}
-                        </span>
-                      </div>
-                      <Badge variant="secondary">
-                        {new Date(log.created_at).toLocaleTimeString()}
-                      </Badge>
-                    </div>
-                  ))
+                 ) : moderationLogs.length > 0 ? (
+                   moderationLogs.slice(0, 5).map((log) => (
+                     <div key={log.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                       <div className="flex items-center space-x-2">
+                         {log.action === 'warn' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                         {log.action === 'ban' && <Ban className="h-4 w-4 text-red-500" />}
+                         {log.action === 'kick' && <UserX className="h-4 w-4 text-orange-500" />}
+                         {log.action === 'clear_messages' && <MessageSquare className="h-4 w-4 text-blue-500" />}
+                         {log.action === 'timeout' && <Clock className="h-4 w-4 text-purple-500" />}
+                         <span className="text-sm font-medium">
+                           {log.action} - {log.target}
+                         </span>
+                       </div>
+                       <Badge variant="secondary">
+                         {new Date(log.timestamp).toLocaleTimeString()}
+                       </Badge>
+                     </div>
+                   ))
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
                     No recent moderation actions

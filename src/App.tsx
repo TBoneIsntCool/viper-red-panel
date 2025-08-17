@@ -29,11 +29,7 @@ const App = () => {
     const storedUserId = localStorage.getItem('discord_user_id');
     if (storedUserId) {
       // Validate user session with backend
-      fetch('/functions/v1/discord-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_user', user_id: storedUserId })
-      })
+      fetch(`/api/me/${storedUserId}`)
       .then(res => res.json())
       .then(data => {
         if (data.user) {
@@ -51,10 +47,9 @@ const App = () => {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('/functions/v1/discord-auth', {
+      const response = await fetch('/auth/discord', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login' })
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await response.json();
       

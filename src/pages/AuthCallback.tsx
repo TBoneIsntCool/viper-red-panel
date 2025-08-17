@@ -26,11 +26,10 @@ const AuthCallback = ({ onLogin }: AuthCallbackProps) => {
       }
 
       try {
-        const response = await fetch('/functions/v1/discord-auth', {
+        const response = await fetch('/auth/callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            action: 'callback', 
             code: code 
           })
         });
