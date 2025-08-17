@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthCallbackProps {
   onLogin: (user: any) => void;
@@ -26,15 +27,16 @@ const AuthCallback = ({ onLogin }: AuthCallbackProps) => {
       }
 
       try {
-        const response = await fetch('/auth/callback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+        const { data, error } = await supabase.functions.invoke('discord-auth', {
+          body: { 
+            action: 'callback',
             code: code 
-          })
+          }
         });
 
-        const data = await response.json();
+        if (error) {
+          throw error;
+        }
 
         if (data.user) {
           onLogin(data.user);

@@ -11,6 +11,7 @@ import Panel from "./pages/Panel";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./pages/AuthCallback";
+import Login from "./pages/Login";
 
 const queryClient = new QueryClient();
 
@@ -45,20 +46,8 @@ const App = () => {
     }
   }, []);
 
-  const handleLogin = async () => {
-    try {
-      const response = await fetch('/auth/discord', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await response.json();
-      
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      console.error('Login failed:', error);
-    }
+  const handleLogin = () => {
+    window.location.href = '/login';
   };
 
   const handleLoginCallback = (userData: User) => {
@@ -88,6 +77,7 @@ const App = () => {
           <Layout user={user} onLogin={handleLogin} onLogout={handleLogout}>
             <Routes>
               <Route path="/" element={<Home user={user} onLogin={handleLogin} />} />
+              <Route path="/login" element={<Login onLogin={handleLoginCallback} />} />
               <Route path="/auth/callback" element={<AuthCallback onLogin={handleLoginCallback} />} />
               <Route path="/servers" element={<Servers user={user} />} />
               <Route path="/panel" element={<Panel user={user} />} />
