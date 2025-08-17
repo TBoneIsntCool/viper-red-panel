@@ -1,19 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import mysql from "https://deno.land/x/mysql@v2.12.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-// MySQL connection
-const connection = await mysql.createConnection({
-  hostname: 'localhost',
-  username: 'admin',
-  password: 'IloveANDhaTeSteaK!2399@@',
-  db: 'mydb'
-});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, code, user_id } = await req.json()
+    const { action, code } = await req.json()
 
     if (action === 'login') {
       // Discord OAuth2 login redirect
@@ -74,25 +65,28 @@ serve(async (req) => {
       })
       const guildsData = await guildsResponse.json()
 
-      // Store/update user in MySQL
-      await connection.execute(`
-        INSERT INTO users (discord_id, username, avatar, access_token, refresh_token, guilds)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-        username = VALUES(username),
-        avatar = VALUES(avatar),
-        access_token = VALUES(access_token),
-        refresh_token = VALUES(refresh_token),
-        guilds = VALUES(guilds),
-        last_login = CURRENT_TIMESTAMP
-      `, [
-        userData.id,
-        userData.username,
-        userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : null,
-        tokenData.access_token,
-        tokenData.refresh_token,
-        JSON.stringify(guildsData)
-      ])
+      // Create Supabase client
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+
+      // Store user data in profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          discord_id: userData.id,
+          username: userData.username,
+          avatar: userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : null,
+          guilds: guildsData,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          last_login: new Date().toISOString()
+        })
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError)
+      }
 
       return new Response(
         JSON.stringify({
@@ -107,40 +101,13 @@ serve(async (req) => {
       )
     }
 
-    if (action === 'get_user') {
-      // Get user from database
-      const result = await connection.execute(
-        'SELECT discord_id, username, avatar, guilds FROM users WHERE discord_id = ?',
-        [user_id]
-      )
-      
-      if (result.rows && result.rows.length > 0) {
-        const user = result.rows[0]
-        return new Response(
-          JSON.stringify({
-            user: {
-              id: user.discord_id,
-              username: user.username,
-              avatar: user.avatar
-            },
-            guilds: JSON.parse(user.guilds || '[]')
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      } else {
-        return new Response(
-          JSON.stringify({ error: 'User not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
+    console.error('Discord auth error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
