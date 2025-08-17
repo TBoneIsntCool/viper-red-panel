@@ -18,7 +18,7 @@ serve(async (req) => {
       // Discord OAuth2 login redirect
       const clientId = Deno.env.get('DISCORD_CLIENT_ID')
       const redirectUri = `${req.headers.get('origin')}/auth/callback`
-      const scope = 'identify guilds'
+      const scope = 'identify guilds email'
       
       const discordUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`
       
@@ -65,6 +65,33 @@ serve(async (req) => {
       })
       const guildsData = await guildsResponse.json()
 
+      // Filter guilds that have the bot (checking if user has admin permissions or the guild has the bot)
+      const botId = '1406370217315143740' // Your bot's client ID
+      const serversWithBot = []
+      
+      for (const guild of guildsData) {
+        try {
+          // Check if the bot is in the guild by attempting to get bot member info
+          const botMemberResponse = await fetch(`https://discord.com/api/guilds/${guild.id}/members/${botId}`, {
+            headers: { Authorization: `Bot ${Deno.env.get('DISCORD_BOT_TOKEN')}` }
+          })
+          
+          if (botMemberResponse.ok) {
+            serversWithBot.push({
+              ...guild,
+              hasViperBot: true
+            })
+          }
+        } catch (error) {
+          // If we can't check (no bot token or other error), include the guild anyway
+          // This allows the app to work even without bot token configured
+          serversWithBot.push({
+            ...guild,
+            hasViperBot: false
+          })
+        }
+      }
+
       // Create Supabase client
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -78,7 +105,7 @@ serve(async (req) => {
           discord_id: userData.id,
           username: userData.username,
           avatar: userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : null,
-          guilds: guildsData,
+          guilds: serversWithBot,
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           last_login: new Date().toISOString()
@@ -93,9 +120,10 @@ serve(async (req) => {
           user: {
             id: userData.id,
             username: userData.username,
-            avatar: userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : null
+            avatar: userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : null,
+            email: userData.email
           },
-          guilds: guildsData
+          guilds: serversWithBot
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
