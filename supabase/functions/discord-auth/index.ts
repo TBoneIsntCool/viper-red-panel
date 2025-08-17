@@ -98,7 +98,7 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       )
 
-      // Store user data in profiles table
+      // Store user data in profiles table (do NOT store tokens client-side)
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -106,8 +106,6 @@ serve(async (req) => {
           username: userData.username,
           avatar: userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : null,
           guilds: serversWithBot,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
           last_login: new Date().toISOString()
         })
 

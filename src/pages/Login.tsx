@@ -14,30 +14,12 @@ const Login = ({ onLogin }: LoginProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleDiscordLogin = async () => {
+  const handleDiscordLogin = () => {
     try {
       setLoading(true);
-      
-      const { data, error } = await supabase.functions.invoke('discord-auth', {
-        body: { action: 'login' }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data?.url) {
-        window.location.href = data.url;
-      }
+      window.location.href = 'https://discord.com/oauth2/authorize?client_id=1406370217315143740&response_type=code&redirect_uri=https%3A%2F%2Fee1e8c5c-58f2-4134-bb6a-bb8a764388aa.lovableproject.com%2Fauth%2Fcallback&scope=identify+guilds+email';
     } catch (error) {
       console.error('Login error:', error);
-      toast({
-        title: "Login Failed",
-        description: "Failed to initiate Discord login. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 

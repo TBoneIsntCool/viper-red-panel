@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ViperButton } from "@/components/ui/button-variants";
 import { Crown, Shield, Settings, BarChart3, Users, Hash } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+
 
 interface Server {
   id: string;
@@ -63,42 +63,31 @@ const Servers = ({ user }: ServersProps) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserServers = async () => {
-      if (!user) return;
-      
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('guilds')
-          .eq('discord_id', user.id)
-          .single();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          return;
-        }
-
-        if (profile?.guilds && Array.isArray(profile.guilds)) {
-          const mappedServers: Server[] = profile.guilds.map((guild: any) => ({
+    try {
+      const stored = localStorage.getItem('guilds');
+      const guilds = stored ? JSON.parse(stored) : [];
+      const mappedServers: Server[] = Array.isArray(guilds)
+        ? guilds.map((guild: any) => ({
             id: guild.id,
             name: guild.name,
             icon: guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : undefined,
             memberCount: guild.approximate_member_count || 0,
             userRole: guild.permissions ? getUserRoleFromPermissions(guild.permissions) : "Member",
-            hasViperBot: guild.hasViperBot || false,
-            permissions: guild.permissions
-          }));
-          
-          setServers(mappedServers);
-        }
-      } catch (error) {
-        console.error('Error loading servers:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserServers();
+            hasViperBot: Boolean(guild.hasViperBot),
+            permissions: guild.permissions,
+          }))
+        : [];
+      setServers(mappedServers);
+    } catch (e) {
+      console.error('Error parsing guilds from storage', e);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   const viperServers = servers.filter(server => server.hasViperBot);

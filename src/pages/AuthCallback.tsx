@@ -39,6 +39,7 @@ const AuthCallback = ({ onLogin }: AuthCallbackProps) => {
         }
 
         if (data.user) {
+          try { localStorage.setItem('guilds', JSON.stringify(data.guilds || [])); } catch {}
           onLogin(data.user);
           navigate('/servers');
         } else {
