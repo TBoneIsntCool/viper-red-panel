@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ViperButton } from "@/components/ui/button-variants";
 import { Crown, Shield, Settings, BarChart3, Users, Hash } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Server {
   id: string;
   name: string;
   icon?: string;
-  memberCount: number;
+  memberCount?: number;
   userRole: string;
   hasViperBot: boolean;
+  permissions?: string;
 }
 
 interface ServersProps {
@@ -19,40 +21,18 @@ interface ServersProps {
   } | null;
 }
 
-// Mock data - in real app this would come from Discord API
-const mockServers: Server[] = [
-  {
-    id: "1",
-    name: "Emergency Response: Liberty County",
-    icon: "https://cdn.discordapp.com/icons/372837222396370944/a_f1b7b4c7b8c7b4c7b8c7b4c7b8c7b4c7.gif",
-    memberCount: 45678,
-    userRole: "Owner",
-    hasViperBot: true,
-  },
-  {
-    id: "2", 
-    name: "Greenville Roleplay",
-    icon: "https://cdn.discordapp.com/icons/384384203172519936/f1b7b4c7b8c7b4c7b8c7b4c7b8c7b4c7.png",
-    memberCount: 12345,
-    userRole: "Administrator",
-    hasViperBot: true,
-  },
-  {
-    id: "3",
-    name: "Mountain Interactive",
-    icon: "https://cdn.discordapp.com/icons/462382042893508608/a_f1b7b4c7b8c7b4c7b8c7b4c7b8c7b4c7.gif",
-    memberCount: 8901,
-    userRole: "Moderator",
-    hasViperBot: true,
-  },
-  {
-    id: "4",
-    name: "Policesim Public Safety",
-    memberCount: 3456,
-    userRole: "Member",
-    hasViperBot: false,
-  },
-];
+const getUserRoleFromPermissions = (permissions: string): string => {
+  const perms = parseInt(permissions);
+  
+  // Check for specific permissions (bitwise)
+  if (perms & 0x8) return "Administrator"; // ADMINISTRATOR
+  if (perms & 0x20000000) return "Owner"; // MANAGE_GUILD (owner-like)
+  if (perms & 0x10000000) return "Moderator"; // MANAGE_MESSAGES
+  if (perms & 0x2) return "Moderator"; // KICK_MEMBERS
+  if (perms & 0x4) return "Moderator"; // BAN_MEMBERS
+  
+  return "Member";
+};
 
 const getRoleIcon = (role: string) => {
   switch (role.toLowerCase()) {
@@ -70,6 +50,7 @@ const getRoleIcon = (role: string) => {
 };
 
 const formatMemberCount = (count: number) => {
+  if (!count) return "N/A";
   if (count >= 1000) {
     return `${(count / 1000).toFixed(1)}k`;
   }
@@ -78,8 +59,60 @@ const formatMemberCount = (count: number) => {
 
 const Servers = ({ user }: ServersProps) => {
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
+  const [servers, setServers] = useState<Server[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const viperServers = mockServers.filter(server => server.hasViperBot);
+  useEffect(() => {
+    const fetchUserServers = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('guilds')
+          .eq('discord_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          return;
+        }
+
+        if (profile?.guilds && Array.isArray(profile.guilds)) {
+          const mappedServers: Server[] = profile.guilds.map((guild: any) => ({
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : undefined,
+            memberCount: guild.approximate_member_count || 0,
+            userRole: guild.permissions ? getUserRoleFromPermissions(guild.permissions) : "Member",
+            hasViperBot: guild.hasViperBot || false,
+            permissions: guild.permissions
+          }));
+          
+          setServers(mappedServers);
+        }
+      } catch (error) {
+        console.error('Error loading servers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserServers();
+  }, [user]);
+
+  const viperServers = servers.filter(server => server.hasViperBot);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-foreground-muted">Loading your servers...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -157,7 +190,7 @@ const Servers = ({ user }: ServersProps) => {
                       <div className="flex items-center gap-4 text-sm text-foreground-muted">
                         <span className="flex items-center gap-1">
                           <Users size={14} />
-                          {formatMemberCount(server.memberCount)} members
+                          {formatMemberCount(server.memberCount || 0)} members
                         </span>
                         <span className="flex items-center gap-1">
                           {getRoleIcon(server.userRole)}
