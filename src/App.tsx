@@ -3,35 +3,86 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Servers from "./pages/Servers";
 import Panel from "./pages/Panel";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
-// Mock user for development - in production this would come from Supabase auth
-const mockUser = {
-  id: "12345",
-  username: "TestUser",
-  avatar: "https://cdn.discordapp.com/avatars/12345/a_1234567890abcdef.gif"
-};
+interface User {
+  id: string;
+  username: string;
+  avatar?: string;
+}
 
 const App = () => {
-  const [user, setUser] = useState<typeof mockUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleLogin = () => {
-    // In production, this would trigger Discord OAuth2 via Supabase
-    console.log("Login with Discord OAuth2");
-    setUser(mockUser);
+  // Check for existing user session on app load
+  useEffect(() => {
+    const storedUserId = localStorage.getItem('discord_user_id');
+    if (storedUserId) {
+      // Validate user session with backend
+      fetch('/functions/v1/discord-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_user', user_id: storedUserId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setUser(data.user);
+        } else {
+          localStorage.removeItem('discord_user_id');
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      const response = await fetch('/functions/v1/discord-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login' })
+      });
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
+  };
+
+  const handleLoginCallback = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem('discord_user_id', userData.id);
   };
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('discord_user_id');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -42,6 +93,7 @@ const App = () => {
           <Layout user={user} onLogin={handleLogin} onLogout={handleLogout}>
             <Routes>
               <Route path="/" element={<Home user={user} onLogin={handleLogin} />} />
+              <Route path="/auth/callback" element={<AuthCallback onLogin={handleLoginCallback} />} />
               <Route path="/servers" element={<Servers user={user} />} />
               <Route path="/panel" element={<Panel user={user} />} />
               <Route path="/dashboard" element={<Dashboard user={user} />} />

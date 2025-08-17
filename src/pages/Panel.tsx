@@ -1,15 +1,22 @@
-import { useState } from "react";
-import { ViperButton } from "@/components/ui/button-variants";
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import { 
+  Shield, 
+  Users, 
+  MessageSquare, 
+  AlertTriangle, 
+  Clock, 
   Play, 
   Square, 
-  FileText, 
-  Clock, 
-  Users, 
-  Shield, 
-  AlertTriangle,
-  CheckCircle,
-  Activity
+  Activity,
+  Ban,
+  UserX,
+  MessageCircle,
+  Eye
 } from "lucide-react";
 
 interface PanelProps {
@@ -17,21 +24,155 @@ interface PanelProps {
     id: string;
     username: string;
     avatar?: string;
-  } | null;
+  };
+}
+
+interface ModerationLog {
+  id: number;
+  action_type: string;
+  target_user: string;
+  reason: string;
+  moderator_name: string;
+  created_at: string;
+}
+
+interface ServerStats {
+  memberCount: number;
+  todayModerations: number;
+  activeModerators: number;
+  totalShiftTime: number;
 }
 
 const Panel = ({ user }: PanelProps) => {
+  const { toast } = useToast();
   const [shiftActive, setShiftActive] = useState(false);
   const [shiftStartTime, setShiftStartTime] = useState<Date | null>(null);
+  const [moderationLogs, setModerationLogs] = useState<ModerationLog[]>([]);
+  const [serverStats, setServerStats] = useState<ServerStats>({
+    memberCount: 0,
+    todayModerations: 0,
+    activeModerators: 0,
+    totalShiftTime: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  const handleStartShift = () => {
-    setShiftActive(true);
-    setShiftStartTime(new Date());
+  const serverId = "123456789"; // This would come from route params in a real app
+
+  // Load panel data on component mount
+  useEffect(() => {
+    if (user) {
+      loadPanelData();
+      const interval = setInterval(loadPanelData, 30000); // Refresh every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const loadPanelData = async () => {
+    if (!user) return;
+
+    try {
+      // Load moderation logs
+      const logsResponse = await fetch('/functions/v1/panel-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'get_moderation_logs', 
+          server_id: serverId 
+        })
+      });
+      const logsData = await logsResponse.json();
+      setModerationLogs(logsData.logs || []);
+
+      // Load server stats
+      const statsResponse = await fetch('/functions/v1/panel-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'get_server_stats', 
+          server_id: serverId 
+        })
+      });
+      const statsData = await statsResponse.json();
+      setServerStats(statsData);
+
+    } catch (error) {
+      console.error('Failed to load panel data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load panel data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEndShift = () => {
-    setShiftActive(false);
-    setShiftStartTime(null);
+  const handleStartShift = async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/functions/v1/panel-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'start_shift', 
+          user_id: user.id, 
+          server_id: serverId 
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setShiftActive(true);
+        setShiftStartTime(new Date());
+        toast({
+          title: "Shift Started",
+          description: "Your moderation shift has begun"
+        });
+        loadPanelData(); // Refresh stats
+      }
+    } catch (error) {
+      console.error('Failed to start shift:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start shift",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEndShift = async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/functions/v1/panel-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'end_shift', 
+          user_id: user.id, 
+          server_id: serverId 
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setShiftActive(false);
+        setShiftStartTime(null);
+        toast({
+          title: "Shift Ended",
+          description: "Your moderation shift has ended"
+        });
+        loadPanelData(); // Refresh stats
+      }
+    } catch (error) {
+      console.error('Failed to end shift:', error);
+      toast({
+        title: "Error",
+        description: "Failed to end shift",
+        variant: "destructive"
+      });
+    }
   };
 
   const formatShiftTime = () => {
@@ -46,261 +187,260 @@ const Panel = ({ user }: PanelProps) => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const handleModerationAction = async (action: string, target: string, reason?: string) => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/functions/v1/panel-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'log_action', 
+          user_id: user.id, 
+          server_id: serverId,
+          data: { action, target, reason }
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        toast({
+          title: "Action Logged",
+          description: `${action} action recorded for ${target}`
+        });
+        loadPanelData(); // Refresh logs
+      }
+    } catch (error) {
+      console.error('Failed to log action:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log moderation action",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
-          <p className="text-foreground-muted mb-6">Please log in to access the moderation panel.</p>
+          <p className="text-muted-foreground mb-6">Please log in to access the moderation panel.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-glass-border bg-background-secondary/50 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Moderation Panel</h1>
+          <p className="text-muted-foreground">Welcome back, {user.username}</p>
+        </div>
+        
+        <Card className="p-4">
+          <div className="flex items-center space-x-4">
+            <div className={`w-3 h-3 rounded-full ${shiftActive ? 'bg-green-500' : 'bg-gray-500'}`}></div>
             <div>
-              <h1 className="text-3xl font-bold">Moderation Panel</h1>
-              <p className="text-foreground-muted">ER:LC & Discord Integration</p>
-            </div>
-            
-            {/* Shift Status */}
-            <div className="glass-card p-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${shiftActive ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-                <div>
-                  <p className="text-sm font-medium">
-                    {shiftActive ? 'On Shift' : 'Off Shift'}
-                  </p>
-                  {shiftActive && (
-                    <p className="text-xs text-foreground-muted">
-                      {formatShiftTime()}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <p className="text-sm font-medium">
+                {shiftActive ? 'On Shift' : 'Off Shift'}
+              </p>
+              {shiftActive && (
+                <p className="text-xs text-muted-foreground">
+                  {formatShiftTime()}
+                </p>
+              )}
             </div>
           </div>
-        </div>
-      </header>
+        </Card>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Primary Actions */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Shift Controls */}
-            <div className="glass-card p-6">
-              <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-                <Clock className="text-primary" size={24} />
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Shift Controls */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
                 Shift Management
-              </h2>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <ViperButton
-                    onClick={handleStartShift}
-                    disabled={shiftActive}
-                    variant="viper"
-                    size="xl"
-                    className="w-full"
-                  >
-                    <Play size={20} className="mr-2" />
-                    Start Shift
-                  </ViperButton>
-                  
-                  <ViperButton
-                    onClick={handleEndShift}
-                    disabled={!shiftActive}
-                    variant="destructive"
-                    size="xl"
-                    className="w-full"
-                  >
-                    <Square size={20} className="mr-2" />
-                    End Shift
-                  </ViperButton>
-                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-4">
+                <Button
+                  onClick={handleStartShift}
+                  disabled={shiftActive}
+                  className="flex-1"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Shift
+                </Button>
+                <Button
+                  onClick={handleEndShift}
+                  disabled={!shiftActive}
+                  variant="destructive"
+                  className="flex-1"
+                >
+                  <Square className="h-4 w-4 mr-2" />
+                  End Shift
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-                {shiftActive && (
-                  <div className="bg-background-secondary rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Current Shift</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-foreground-muted">Started:</span>
-                        <span>{shiftStartTime?.toLocaleTimeString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground-muted">Duration:</span>
-                        <span className="font-mono">{formatShiftTime()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground-muted">Status:</span>
-                        <span className="text-green-500 flex items-center gap-1">
-                          <Activity size={12} />
-                          Active
+          {/* Moderation Tools */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <Button variant="outline" className="h-20 flex flex-col">
+                  <Ban className="h-6 w-6 mb-2" />
+                  Ban Member
+                </Button>
+                <Button variant="outline" className="h-20 flex flex-col">
+                  <UserX className="h-6 w-6 mb-2" />
+                  Kick Member
+                </Button>
+                <Button variant="outline" className="h-20 flex flex-col">
+                  <MessageSquare className="h-6 w-6 mb-2" />
+                  Clear Messages
+                </Button>
+                <Button variant="outline" className="h-20 flex flex-col">
+                  <AlertTriangle className="h-6 w-6 mb-2" />
+                  Issue Warning
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {loading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                  </div>
+                ) : moderationLogs.length > 0 ? (
+                  moderationLogs.slice(0, 5).map((log) => (
+                    <div key={log.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        {log.action_type === 'warn' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                        {log.action_type === 'ban' && <Ban className="h-4 w-4 text-red-500" />}
+                        {log.action_type === 'kick' && <UserX className="h-4 w-4 text-orange-500" />}
+                        {log.action_type === 'clear_messages' && <MessageSquare className="h-4 w-4 text-blue-500" />}
+                        {log.action_type === 'timeout' && <Clock className="h-4 w-4 text-purple-500" />}
+                        <span className="text-sm font-medium">
+                          {log.action_type} - {log.target_user}
                         </span>
                       </div>
+                      <Badge variant="secondary">
+                        {new Date(log.created_at).toLocaleTimeString()}
+                      </Badge>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No recent moderation actions
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Moderation Actions */}
-            <div className="glass-card p-6">
-              <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-                <FileText className="text-primary" size={24} />
-                Moderation Tools
-              </h2>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <ViperButton
-                  variant="viper-outline"
-                  size="xl"
-                  className="w-full h-20 flex-col"
-                >
-                  <FileText size={24} className="mb-2" />
-                  Log Moderations
-                </ViperButton>
-                
-                <ViperButton
-                  variant="panel"
-                  size="xl"
-                  className="w-full h-20 flex-col"
-                >
-                  <Users size={24} className="mb-2" />
-                  View Active Users
-                </ViperButton>
-                
-                <ViperButton
-                  variant="panel"
-                  size="xl"
-                  className="w-full h-20 flex-col"
-                >
-                  <Shield size={24} className="mb-2" />
-                  Security Logs
-                </ViperButton>
-                
-                <ViperButton
-                  variant="panel"
-                  size="xl"
-                  className="w-full h-20 flex-col"
-                >
-                  <AlertTriangle size={24} className="mb-2" />
-                  Report Center
-                </ViperButton>
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="glass-card p-6">
-              <h2 className="text-2xl font-semibold mb-4">Recent Activity</h2>
-              <div className="space-y-3">
-                {/* Mock activity items */}
-                <div className="flex items-start gap-3 p-3 bg-background-secondary rounded-lg">
-                  <CheckCircle className="text-green-500 mt-1" size={16} />
-                  <div>
-                    <p className="text-sm">User @member123 was warned for inappropriate behavior</p>
-                    <p className="text-xs text-foreground-muted">2 minutes ago by {user.username}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-3 bg-background-secondary rounded-lg">
-                  <AlertTriangle className="text-yellow-500 mt-1" size={16} />
-                  <div>
-                    <p className="text-sm">Automated spam detection triggered in #general</p>
-                    <p className="text-xs text-foreground-muted">5 minutes ago by Viper Bot</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-3 bg-background-secondary rounded-lg">
-                  <Shield className="text-blue-500 mt-1" size={16} />
-                  <div>
-                    <p className="text-sm">Raid protection activated due to suspicious activity</p>
-                    <p className="text-xs text-foreground-muted">12 minutes ago by Viper Bot</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Stats & Info */}
-          <div className="space-y-6">
-            {/* Server Status */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Server Status</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground-muted">Bot Status</span>
-                  <span className="text-green-500 text-sm flex items-center gap-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    Online
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground-muted">ER:LC Link</span>
-                  <span className="text-green-500 text-sm flex items-center gap-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    Connected
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground-muted">Active Moderators</span>
-                  <span className="text-sm">3</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-foreground-muted">Online Members</span>
-                  <span className="text-sm">1,247</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Today's Activity</h3>
-              <div className="space-y-4">
-                <div className="text-center p-3 bg-background-secondary rounded-lg">
-                  <div className="text-2xl font-bold text-primary">12</div>
-                  <div className="text-xs text-foreground-muted">Moderations</div>
-                </div>
-                <div className="text-center p-3 bg-background-secondary rounded-lg">
-                  <div className="text-2xl font-bold text-primary">3</div>
-                  <div className="text-xs text-foreground-muted">Warnings Issued</div>
-                </div>
-                <div className="text-center p-3 bg-background-secondary rounded-lg">
-                  <div className="text-2xl font-bold text-primary">7</div>
-                  <div className="text-xs text-foreground-muted">Messages Deleted</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Emergency Actions */}
-            <div className="glass-card p-6 border border-red-500/30">
-              <h3 className="text-lg font-semibold mb-4 text-red-400">Emergency Actions</h3>
-              <div className="space-y-2">
-                <ViperButton
-                  variant="destructive"
-                  size="sm"
-                  className="w-full"
-                >
-                  Lockdown Server
-                </ViperButton>
-                <ViperButton
-                  variant="destructive"
-                  size="sm"
-                  className="w-full"
-                >
-                  Enable Raid Mode
-                </ViperButton>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
-      </main>
+
+        {/* Right Column - Stats */}
+        <div className="space-y-6">
+          {/* Server Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Server Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center space-x-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm">Active Members</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{serverStats.memberCount.toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">Total server members</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center space-x-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm">Today's Actions</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{serverStats.todayModerations}</div>
+                    <p className="text-xs text-muted-foreground">Moderation actions today</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Active Moderators</span>
+                  <div className="text-2xl font-bold">{serverStats.activeModerators}</div>
+                    <p className="text-xs text-muted-foreground">Currently on shift</p>
+                </div>
+                
+                <Separator />
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Total Shift Time</span>
+                  <div className="text-2xl font-bold">
+                    {Math.floor(serverStats.totalShiftTime / 60)}h {serverStats.totalShiftTime % 60}m
+                  </div>
+                    <p className="text-xs text-muted-foreground">Total today</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Emergency Actions */}
+          <Card className="border-red-500/50">
+            <CardHeader>
+              <CardTitle className="text-red-500">Emergency Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button variant="destructive" className="w-full">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Server Lockdown
+              </Button>
+              <Button variant="destructive" className="w-full">
+                <Shield className="h-4 w-4 mr-2" />
+                Enable Raid Mode
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
